@@ -217,3 +217,14 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+
+# Project runtime artifacts
+logs/
+artifacts/raw_data/
+artifacts/transformed_data/
+artifacts/serialized_objects/
+artifacts/trained_model/

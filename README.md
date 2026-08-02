@@ -1,4 +1,4 @@
-# End-to-End-Books-Recommender-System
+# End-to-End-Book-Recommender-System
 
 
 ## Workflow
@@ -67,7 +67,7 @@ python main.py
 
 
 
-# Streamlit app Docker Image Deployment (Azure)
+# Streamlit App Docker Image Deployment (Azure)
 
 This section deploys the app as a Docker container running on a standalone Azure VM (as opposed to running it locally via `streamlit run`).
 
@@ -89,13 +89,13 @@ For further reading:
 az login
 
 # Resource group: a logical container that groups all resources for this project (VM, ACR, etc.)
-az group create --name books-recommender-rg --location eastus
+az group create --name books_recommender_rg --location eastus
 
 
 
 # Provision an Ubuntu VM to host the Docker container; --generate-ssh-keys creates/reuses a local SSH keypair for access
 az vm create \
-  --resource-group books-recommender-rg \
+  --resource-group books_recommender_rg \
   --name books-recommender-vm \
   --image Ubuntu2204 \
   --admin-username azureuser \
@@ -103,7 +103,7 @@ az vm create \
   --size Standard_B2s
 
 # Open port 8501 in the VM's firewall (NSG) so the Streamlit app is reachable from the internet
-az vm open-port --resource-group books-recommender-rg --name books-recommender-vm --port 8501
+az vm open-port --resource-group books_recommender_rg --name books-recommender-vm --port 8501
 ```
 
 Why this matters: the VM hosts Docker, and the NSG rule is what allows browser access to Streamlit from your local machine.
@@ -113,7 +113,7 @@ Why this matters: the VM hosts Docker, and the NSG rule is what allows browser a
 ```bash
 # Connect to the VM using your SSH key and VM public IP (from az vm create output)
 # Use your own key path and VM public IP address
-ssh -i Books-Recommender-System\notebook\books-recommender-vm_key.pem azureuser@20.102.41.93
+ssh -i <path-to-private-key>.pem azureuser@<vm-public-ip>
 
 ```
 
@@ -182,6 +182,8 @@ For further reading: Docker run reference: https://docs.docker.com/reference/cli
 docker run -d -p 8501:8501 stapp 
 ```
 
+The app is now reachable at `http://<vm-public-ip>:8501/`.
+
 ```bash
 # Confirm the container is running and capture container_id
 # List running containers and capture the container ID
@@ -200,20 +202,71 @@ docker stop container_id
 docker rm $(docker ps -a -q)
 ```
 
-The app is now reachable at `http://<vm-public-ip>:8501`.
+
 
 ## 3. (Optional) Push the image to Azure Container Registry (ACR)
 
 Useful if you want to store/version the image in the cloud and deploy it elsewhere (e.g. Azure Container Instances/AKS) instead of building it fresh on every VM.
 For further reading: Azure Container Registry overview: https://learn.microsoft.com/azure/container-registry/container-registry-intro
 
+Before creating ACR, ensure your subscription is registered for the Container Registry provider.
+
+```bash
+az provider register --namespace Microsoft.ContainerRegistry
+az provider show --namespace Microsoft.ContainerRegistry --query registrationState -o tsv
+```
+
+If you see `az: command not found` on the Ubuntu VM, install Azure CLI first:
+
+```bash
+# Install Microsoft package signing key and repository
+curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+
+# Verify installation
+az version
+
+# Re-authenticate after installation
+az login
+```
+
 ```bash
 # Create a private container registry to store the image
-az acr create --resource-group books-recommender-rg --name booksrecommenderacr --sku Basic
+ az acr create --resource-group books_recommender_rg --name booksrecommenderacr --sku Basic
 
 # Authenticate Docker against the registry
 az acr login --name booksrecommenderacr
 ```
+
+If `az login` or `az acr login` fails with `Error Code: 530035` (device unregistered / blocked by tenant policy):
+
+1. Try explicit tenant + device code login (works in many restricted SSH/VM flows):
+
+```bash
+az login --tenant <your-tenant-id> --use-device-code
+```
+
+2. If your organization still blocks Azure CLI sign-in on that VM, use ACR admin credentials instead of `az acr login`:
+
+```bash
+# Run these from a machine/account that CAN access Azure (Portal or CLI)
+az acr update -n booksrecommenderacr --admin-enabled true
+az acr credential show -n booksrecommenderacr
+
+# Then, on the VM, login Docker directly with the returned username/password
+docker login booksrecommenderacr.azurecr.io -u <acr-username> -p <acr-password>
+```
+
+Security note: never commit or share real tokens/passwords in this repository. If credentials were exposed previously, rotate them immediately in Azure.
+
+If tenant policy continues to block sign-in, contact your Azure AD admin and share Correlation ID + Timestamp from the error page.
+
+If Docker is not installed on the machine where you run this command, use `--expose-token` for non-Docker auth flows:
+
+```bash
+az acr login --name booksrecommenderacr --expose-token
+```
+
+Important: run the next Docker tag/push commands on the same machine where `stapp:latest` exists (your Ubuntu VM if you built it there).
 
 This is optional but useful when you want repeatable deployments without rebuilding the image on each VM.
 
