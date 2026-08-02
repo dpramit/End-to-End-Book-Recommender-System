@@ -1,4 +1,4 @@
-FROM python:3.11-slim-bookworm AS builder
+FROM python:3.12-slim-bookworm AS builder
 
 RUN apt-get update && apt-get install -y \
     build-essential \
@@ -11,7 +11,7 @@ COPY . /app
 RUN pip install --no-cache-dir --user -r requirements.txt
 
 
-FROM python:3.11-slim-bookworm
+FROM python:3.12-slim-bookworm
 
 EXPOSE 8501
 
