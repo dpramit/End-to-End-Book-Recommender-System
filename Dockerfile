@@ -7,11 +7,8 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir --user -r requirements.txt
-
 COPY . /app
-RUN pip install --no-cache-dir --user -e .
+RUN pip install --no-cache-dir --user -r requirements.txt
 
 
 FROM python:3.11-slim-bookworm
